@@ -28,3 +28,7 @@ header p { font-size: 0.85rem; color: #888; margin-top: 0.3rem; }
 .conf-good { color: #00ff88; background: rgba(0,255,136,0.1); }
 .conf-moderate { color: #ffaa00; background: rgba(255,170,0,0.1); }
 .conf-poor { color: #ff4444; background: rgba(255,68,68,0.1); }
+.controls { display: flex; gap: 1rem; justify-content: center; }
+.controls button { padding: 0.8rem 2.5rem; font-size: 1rem; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+#start-btn { background: #00ff88; color: #0a0a0f; }
+#stop-btn { background: #ff4444; color: #fff; }

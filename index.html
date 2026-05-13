@@ -15,6 +15,26 @@
       <div class="video-wrapper">
         <video id="video" autoplay muted playsinline></video>
       </div>
+      <div class="status-panel">
+        <div><div class="status-label">Status</div><div id="status" class="status-value">Ready to scan</div></div>
+        <div><div class="status-label">Timer</div><div id="timer" class="timer-display">01:00</div></div>
+        <div><div class="status-label">Chunks Received</div><div id="chunk-count" class="status-value">0</div></div>
+        <div><div class="status-label">Effective FPS</div><div id="live-fps" class="status-value">--</div></div>
+      </div>
+    </div>
+    <div class="vitals-row">
+      <div class="vital-card hr">
+        <div class="vital-label">Heart Rate</div>
+        <div id="hr-value" class="vital-value">--</div>
+        <div class="vital-unit">BPM</div>
+        <div id="hr-conf" class="vital-confidence">--</div>
+      </div>
+      <div class="vital-card rr">
+        <div class="vital-label">Respiratory Rate</div>
+        <div id="rr-value" class="vital-value">--</div>
+        <div class="vital-unit">RPM</div>
+        <div id="rr-conf" class="vital-confidence">--</div>
+      </div>
     </div>
   </div>
 </body>

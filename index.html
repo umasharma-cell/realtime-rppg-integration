@@ -4,24 +4,46 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Real-Time rPPG Vital Signs Monitor</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <header>
     <h1>Real-Time rPPG Vital Signs Monitor</h1>
     <p>Heart rate and respiratory rate estimation from facial video</p>
   </header>
+
   <div class="app-container">
+    <!-- Warning / Error banners -->
+    <div id="warning-banner" class="warning-banner"></div>
+    <div id="error-banner" class="error-banner"></div>
+
+    <!-- Video + Status -->
     <div class="video-section">
       <div class="video-wrapper">
         <video id="video" autoplay muted playsinline></video>
       </div>
       <div class="status-panel">
-        <div><div class="status-label">Status</div><div id="status" class="status-value">Ready to scan</div></div>
-        <div><div class="status-label">Timer</div><div id="timer" class="timer-display">01:00</div></div>
-        <div><div class="status-label">Chunks Received</div><div id="chunk-count" class="status-value">0</div></div>
-        <div><div class="status-label">Effective FPS</div><div id="live-fps" class="status-value">--</div></div>
+        <div>
+          <div class="status-label">Status</div>
+          <div id="status" class="status-value">Ready to scan</div>
+        </div>
+        <div>
+          <div class="status-label">Timer</div>
+          <div id="timer" class="timer-display">01:00</div>
+        </div>
+        <div>
+          <div class="status-label">Chunks Received</div>
+          <div id="chunk-count" class="status-value">0</div>
+        </div>
+        <div>
+          <div class="status-label">Effective FPS</div>
+          <div id="live-fps" class="status-value">--</div>
+        </div>
       </div>
     </div>
+
+    <!-- Vitals Cards -->
     <div class="vitals-row">
       <div class="vital-card hr">
         <div class="vital-label">Heart Rate</div>
@@ -36,6 +58,98 @@
         <div id="rr-conf" class="vital-confidence">--</div>
       </div>
     </div>
+
+    <!-- Waveforms -->
+    <div class="waveform-section">
+      <div class="waveform-container">
+        <div class="waveform-label">PPG Waveform (Heartbeat Signal)</div>
+        <canvas id="ppg-canvas"></canvas>
+      </div>
+      <div class="waveform-container">
+        <div class="waveform-label">Respiratory Waveform (Breathing Signal)</div>
+        <canvas id="resp-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <button id="start-btn">Start Scan</button>
+      <button id="stop-btn" disabled>Stop</button>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="metrics-panel">
+      <h3>Performance Metrics</h3>
+      <div class="metrics-grid">
+        <div class="metric-item">
+          <div class="metric-label">Avg FPS</div>
+          <div id="metric-fps" class="metric-value">--</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">Avg Chunk Interval</div>
+          <div id="metric-interval" class="metric-value">--</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">Total Chunks</div>
+          <div id="metric-total-chunks" class="metric-value">0</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">Valid Chunks</div>
+          <div id="metric-valid-chunks" class="metric-value">0</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">Face Uptime</div>
+          <div id="metric-face-uptime" class="metric-value">--</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">Wall-Clock Time</div>
+          <div id="metric-wall-time" class="metric-value">--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results Overlay (hidden until session complete) -->
+    <div id="results-overlay" class="results-overlay">
+      <h2>Session Complete</h2>
+      <div class="results-finals">
+        <div class="result-card hr">
+          <div class="result-label">Final Heart Rate</div>
+          <div id="result-hr" class="result-value">--</div>
+          <div class="result-label">BPM (confidence-weighted avg)</div>
+          <div id="result-hr-trimmed" class="result-secondary"></div>
+        </div>
+        <div class="result-card rr">
+          <div class="result-label">Final Respiratory Rate</div>
+          <div id="result-rr" class="result-value">--</div>
+          <div class="result-label">RPM (confidence-weighted avg)</div>
+          <div id="result-rr-trimmed" class="result-secondary"></div>
+        </div>
+      </div>
+      <div class="chunk-table-wrapper">
+        <h3>Chunk History</h3>
+        <table class="chunk-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Time</th>
+              <th>HR (BPM)</th>
+              <th>HR Conf</th>
+              <th>RR (RPM)</th>
+              <th>RR Conf</th>
+              <th>FPS</th>
+            </tr>
+          </thead>
+          <tbody id="chunk-table-body"></tbody>
+        </table>
+      </div>
+      <div class="controls">
+        <button id="new-session-btn">Start New Session</button>
+      </div>
+    </div>
   </div>
+
+  
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>
+

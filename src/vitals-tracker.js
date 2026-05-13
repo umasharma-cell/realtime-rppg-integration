@@ -1,10 +1,13 @@
 import { CONFIDENCE_THRESHOLDS } from './constants.js';
 
-// Physiological sanity bounds
-const HR_MIN = 40;
-const HR_MAX = 180;
+// Physiological sanity bounds (tightened for resting/seated measurement)
+const HR_MIN = 45;
+const HR_MAX = 140;
 const RR_MIN = 6;
-const RR_MAX = 35;
+const RR_MAX = 30;
+
+// Stability filter: reject chunks that deviate too far from the running median
+const HR_MAX_DEVIATION = 30; // BPM deviation from median to flag as motion artifact
 
 class VitalsTracker {
   constructor() {
@@ -13,10 +16,10 @@ class VitalsTracker {
     this.respBuffer = [];
     this.maxWaveformPoints = 500;
     this.sessionStartTime = null;
-    // Smoothing window for display (median of last N valid values)
     this.recentHR = [];
     this.recentRR = [];
     this.smoothingWindow = 5;
+    this.stableHRHistory = []; // only confirmed-stable readings for deviation check
   }
 
   addChunk(result) {
@@ -39,12 +42,28 @@ class VitalsTracker {
       rrConf = null;
     }
 
-    // Track recent valid values for smoothing
-    if (hr != null) {
+    // Stability filter: reject HR that deviates too far from the running median
+    // This catches motion artifacts where the SDK returns a number but it's garbage
+    if (hr != null && this.stableHRHistory.length >= 3) {
+      const medianHR = this._median(this.stableHRHistory);
+      if (Math.abs(hr - medianHR) > HR_MAX_DEVIATION) {
+        // This reading is likely a motion artifact — mark it as unreliable
+        hrConf = Math.min(hrConf || 0, 0.2); // force low confidence
+      }
+    }
+
+    // Track stable HR values (only readings with decent confidence)
+    if (hr != null && hrConf != null && hrConf >= CONFIDENCE_THRESHOLDS.VITAL_GOOD) {
+      this.stableHRHistory.push(hr);
+      if (this.stableHRHistory.length > 15) this.stableHRHistory.shift();
+    }
+
+    // Track recent valid values for display smoothing
+    if (hr != null && hrConf != null && hrConf >= CONFIDENCE_THRESHOLDS.VITAL_MODERATE) {
       this.recentHR.push(hr);
       if (this.recentHR.length > this.smoothingWindow) this.recentHR.shift();
     }
-    if (rr != null) {
+    if (rr != null && rrConf != null && rrConf >= CONFIDENCE_THRESHOLDS.VITAL_MODERATE) {
       this.recentRR.push(rr);
       if (this.recentRR.length > this.smoothingWindow) this.recentRR.shift();
     }
@@ -57,7 +76,6 @@ class VitalsTracker {
       rr,
       hrConf,
       rrConf,
-      // Smoothed values for display (median of recent readings)
       hrSmoothed: this._median(this.recentHR),
       rrSmoothed: this._median(this.recentRR),
       fps: result.fps ?? null,
@@ -126,8 +144,7 @@ class VitalsTracker {
     return this.respBuffer;
   }
 
-  // Confidence-weighted mean — primary aggregation method
-  // Only uses chunks with valid (sanity-checked) values
+  // Confidence-weighted mean — only uses chunks with decent confidence
   getWeightedAverage(field, confField) {
     let weightedSum = 0;
     let totalWeight = 0;
@@ -181,6 +198,7 @@ class VitalsTracker {
     this.respBuffer = [];
     this.recentHR = [];
     this.recentRR = [];
+    this.stableHRHistory = [];
     this.sessionStartTime = null;
   }
 }

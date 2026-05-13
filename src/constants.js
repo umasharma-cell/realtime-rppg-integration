@@ -9,7 +9,7 @@ export const SESSION_DURATION = 60; // seconds
 
 export const CONFIDENCE_THRESHOLDS = {
   VITAL_GOOD: 0.55,
-  VITAL_MODERATE: 0.3,
+  VITAL_MODERATE: 0.4,
   FACE_MIN: 0.5,
 };
 

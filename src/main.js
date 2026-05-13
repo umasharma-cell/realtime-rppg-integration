@@ -4,6 +4,7 @@ import sessionController from './session-controller.js';
 import performanceMonitor from './performance-monitor.js';
 import uiRenderer from './ui-renderer.js';
 import rrEstimator from './rr-estimator.js';
+import { CONFIDENCE_THRESHOLDS } from './constants.js';
 
 const videoEl = document.getElementById('video');
 const startBtn = document.getElementById('start-btn');
@@ -14,10 +15,12 @@ let firstVitalsReceived = false;
 let lastChunkRecordTime = 0;
 let isLocalMethod = false;
 let waveformUpdateCounter = 0;
+let lastHRValue = null;          // for motion detection
+let consecutiveLowConfCount = 0; // track sustained low quality
 
-// Throttle chunk recording: cloud fires ~every 4s, local fires every frame
-const CLOUD_CHUNK_INTERVAL_MS = 0;    // no throttle for cloud
-const LOCAL_CHUNK_INTERVAL_MS = 2000; // 1 chunk every 2s for local
+const CLOUD_CHUNK_INTERVAL_MS = 0;
+const LOCAL_CHUNK_INTERVAL_MS = 2000;
+const LOW_CONF_WARNING_THRESHOLD = 3; // warn after 3 consecutive low-conf chunks
 
 // --- Session controller callbacks ---
 
@@ -33,7 +36,7 @@ sessionController.onStateChange((state, prev) => {
       uiRenderer.setStatus('Face detected! Calibrating... hold still');
       break;
     case 'scanning':
-      uiRenderer.setStatus('Scanning vitals — hold still and look at the camera');
+      uiRenderer.setStatus('Scanning vitals — hold still and look directly at the camera');
       break;
     case 'completed':
       handleSessionComplete();
@@ -46,14 +49,12 @@ sessionController.onStateChange((state, prev) => {
 sessionController.onTimerTick((remaining) => {
   uiRenderer.updateTimer(remaining);
 
-  // Check face loss during scanning
   const paused = sessionController.checkFaceLoss();
   if (paused) {
-    uiRenderer.showWarning('Timer paused — face not detected for 5+ seconds. Please look at the camera.');
+    uiRenderer.showWarning('Timer paused — face not detected for 5+ seconds. Please position your face in the frame and look directly at the camera.');
     uiRenderer.setStatus('Paused — face lost');
   }
 
-  // Update metrics live
   const metrics = performanceMonitor.getSummary(vitalsTracker.getValidChunkCount());
   uiRenderer.updateMetrics(metrics);
 });
@@ -61,13 +62,14 @@ sessionController.onTimerTick((remaining) => {
 // --- SDK event handlers ---
 
 function handleVitals(result) {
-  const hasHR = result.vitals?.heart_rate?.value != null;
+  const hr = result.vitals?.heart_rate?.value ?? null;
+  const hrConf = result.vitals?.heart_rate?.confidence;
+  const hasHR = hr != null;
 
-  // Any vitals event with HR means face IS detected (for both cloud and local)
+  // Face detection: if SDK returns HR, face is being tracked
   if (hasHR) {
     performanceMonitor.recordFaceStatus(true);
     sessionController.handleFaceDetected(true);
-    uiRenderer.hideWarning();
   }
 
   // Transition state machine on first valid vitals
@@ -80,7 +82,32 @@ function handleVitals(result) {
   const state = sessionController.getState();
   if (state !== 'scanning' && state !== 'warmingUp') return;
 
-  // Feed PPG data to local RR estimator (only in local mode)
+  // --- Motion / quality detection ---
+  if (hasHR) {
+    const conf = typeof hrConf === 'number' ? hrConf : (Array.isArray(hrConf) ? hrConf[0] : 0);
+
+    // Check for sudden HR jumps (likely motion artifact)
+    if (lastHRValue != null && Math.abs(hr - lastHRValue) > 40) {
+      uiRenderer.showWarning('Movement detected — please hold still for accurate readings');
+      setTimeout(() => {
+        if (sessionController.getState() === 'scanning') uiRenderer.hideWarning();
+      }, 3000);
+    }
+    lastHRValue = hr;
+
+    // Track sustained low confidence
+    if (conf < CONFIDENCE_THRESHOLDS.VITAL_GOOD) {
+      consecutiveLowConfCount++;
+      if (consecutiveLowConfCount >= LOW_CONF_WARNING_THRESHOLD) {
+        uiRenderer.showWarning('Low signal quality — ensure good lighting, face the camera directly, and hold still');
+      }
+    } else {
+      consecutiveLowConfCount = 0;
+      uiRenderer.hideWarning();
+    }
+  }
+
+  // Feed PPG data to local RR estimator
   const ppgData = result.waveforms?.ppg_waveform?.data;
   if (isLocalMethod && ppgData && ppgData.length > 0) {
     rrEstimator.addPPGData(ppgData);
@@ -114,7 +141,7 @@ function handleVitals(result) {
     uiRenderer.updateChunkCount(vitalsTracker.getChunkCount());
   }
 
-  // Update waveforms more frequently for smooth visuals
+  // Update waveforms
   waveformUpdateCounter++;
   if (waveformUpdateCounter % 5 === 0) {
     uiRenderer.updatePPGWaveform(vitalsTracker.getPPGBuffer());
@@ -130,10 +157,6 @@ function handleVitals(result) {
 }
 
 function handleFaceDetected(result) {
-  // The SDK dispatches faceDetected with:
-  //   - A face object (with coordinates/confidence) when face IS found
-  //   - null when face is NOT found
-  // Note: the face object is NOT wrapped in {face: {...}} — it's the raw detection
   const hasFace = result != null;
 
   performanceMonitor.recordFaceStatus(hasFace);
@@ -142,13 +165,12 @@ function handleFaceDetected(result) {
   if (hasFace) {
     uiRenderer.hideWarning();
     if (sessionController.getState() === 'scanning') {
-      uiRenderer.setStatus('Scanning vitals — hold still and look at the camera');
+      uiRenderer.setStatus('Scanning vitals — hold still and look directly at the camera');
     }
   } else {
-    // Only show warning during active states
     const state = sessionController.getState();
     if (state === 'scanning' || state === 'warmingUp' || state === 'searching') {
-      uiRenderer.showWarning('Face not detected — please look at the camera');
+      uiRenderer.showWarning('No face detected — please look directly at the camera. Remove any objects blocking your face.');
     }
   }
 }
@@ -213,6 +235,8 @@ startBtn.addEventListener('click', async () => {
   firstVitalsReceived = false;
   lastChunkRecordTime = 0;
   waveformUpdateCounter = 0;
+  lastHRValue = null;
+  consecutiveLowConfCount = 0;
 
   uiRenderer.resetAll();
   vitalsTracker.reset();
@@ -233,7 +257,6 @@ startBtn.addEventListener('click', async () => {
     await sdkManager.start(videoEl);
     sessionController.handleSDKReady();
 
-    // Check if using fallback local method
     const method = sdkManager.getActiveMethod();
     isLocalMethod = (method !== 'wiseai');
 
@@ -275,6 +298,8 @@ newSessionBtn.addEventListener('click', () => {
   performanceMonitor.reset();
   sessionController.reset();
   rrEstimator.reset();
+  lastHRValue = null;
+  consecutiveLowConfCount = 0;
   startBtn.disabled = false;
   stopBtn.disabled = true;
   uiRenderer.setStatus('Ready to scan');
@@ -291,6 +316,6 @@ document.addEventListener('visibilitychange', () => {
   } else {
     sdkManager.resume();
     uiRenderer.hideWarning();
-    uiRenderer.setStatus('Scanning vitals — hold still and look at the camera');
+    uiRenderer.setStatus('Scanning vitals — hold still and look directly at the camera');
   }
 });

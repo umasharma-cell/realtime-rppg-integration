@@ -2,7 +2,7 @@
 
 A near real-time prototype that estimates **heart rate (HR)** and **respiratory rate (RR)** from a 60-second webcam recording using remote photoplethysmography (rPPG), powered by the WiseAI SDK.
 
-**Live Demo:** [https://realtime-rppg-integration.vercel.app](https://realtime-rppg-integration.vercel.app)
+**Live Demo:** [https://realtime-rppg-integration-qrye.vercel.app](https://realtime-rppg-integration-qrye.vercel.app)
 
 **Repository:** [https://github.com/umasharma-cell/realtime-rppg-integration](https://github.com/umasharma-cell/realtime-rppg-integration)
 
@@ -37,13 +37,27 @@ The app processes video **incrementally in real-time** — not as a batch after 
 
 During scanning, vitals update live as each chunk arrives from the cloud model:
 
-| Stage | Screenshot |
-|-------|-----------|
-| **Camera access & face detection** | App requests camera → detects face → "Calibrating... hold still" |
-| **Live scanning (00:57)** | HR: 82 BPM, 9 chunks received, 29.0 FPS |
-| **Mid-session (00:47)** | HR: 61 BPM (65%), RR: 15 RPM, 20 chunks, PPG waveform visible |
-| **Late session (00:15)** | HR: 77 BPM (66%), RR: 16 RPM (91%), 58 chunks, respiratory waveform visible |
-| **Session complete (00:00)** | HR: 83 BPM (59%), RR: 19 RPM (93%), 76 total chunks, 28.5 FPS |
+**1. Face Detection & Calibration**
+![Face Detection](screenshots/01-face-detection.png)
+![Calibrating](screenshots/02-calibrating.png)
+
+**2. Live Scanning — HR appearing, timer counting down**
+![Scanning Early](screenshots/03-scanning-early.png)
+
+**3. Mid-Session — HR: 61 BPM, RR: 15 RPM, waveforms visible**
+![Scanning Mid](screenshots/04-scanning-mid.png)
+
+**4. Vitals & Waveforms — PPG heartbeat signal + Respiratory breathing signal**
+![Vitals and Waveforms](screenshots/05-vitals-waveforms.png)
+
+**5. Performance Metrics — 28.1 FPS, 46 chunks, 100% face uptime**
+![Metrics](screenshots/06-metrics-waveforms.png)
+
+**6. Late Session (00:15) — HR: 77 BPM, RR: 16 RPM (91% confidence)**
+![Scanning Late](screenshots/07-scanning-late.png)
+
+**7. Session Complete — Final HR: 83 BPM, RR: 19 RPM, timer at 00:00**
+![Session Complete](screenshots/08-session-complete.png)
 
 ### Final BPM (after 60 seconds)
 
@@ -57,7 +71,15 @@ Robust RR estimate:      15 RPM   (trimmed mean)
 
 Both aggregation methods converge to the same value — indicating stable, consistent readings throughout the session.
 
-### Chunk History (selected samples from 76 chunks)
+**Final Results Screen:**
+![Final Results](screenshots/09-final-results.png)
+
+### Chunk History (76 chunks recorded over 60 seconds)
+
+![Chunk History 1](screenshots/10-chunk-history-1.png)
+![Chunk History 2](screenshots/11-chunk-history-2.png)
+
+**Selected chunk data:**
 
 | Chunk | Time | HR (BPM) | HR Conf | RR (RPM) | RR Conf | FPS |
 |-------|------|----------|---------|----------|---------|-----|
@@ -69,10 +91,11 @@ Both aggregation methods converge to the same value — indicating stable, consi
 | 37 | 0:34 | 88 | 68% | 13 | 91% | 28.9 |
 
 **Observations:**
-- HR values range 54–93 BPM across chunks (natural variation from the rPPG signal), but the weighted average converges to a stable 80 BPM
-- RR is remarkably stable at 13–16 RPM with high confidence (89–95%)
+- HR values range 54–93 BPM across chunks (natural variation from the rPPG signal), but the weighted average converges to a stable **80 BPM**
+- RR is remarkably stable at 13–16 RPM with high confidence (89–95%), final average **15 RPM**
 - The first 5 chunks show `--` for HR/RR — this is the SDK warmup period while the model accumulates enough frames
 - RR appears intermittently in early chunks because the respiratory signal needs a longer window to stabilize
+- Both aggregation methods (weighted mean and trimmed mean) converge to identical values, confirming measurement stability
 
 ### Runtime Performance Metrics
 
